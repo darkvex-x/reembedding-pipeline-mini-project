@@ -4,10 +4,16 @@ import { embed } from '../embed.js';
 
 export const searchRouter = express.Router();
 
+/**
+ * Resolves the vector column based on EMBEDDING_VERSION.
+ * embedding_v2 when EMBEDDING_VERSION is v2, otherwise embedding.
+ * Use a fixed choice, never a column name from the request.
+ * @param {string} [version]
+ * @returns {'embedding_v2' | 'embedding'}
+ */
 export function resolveSearchColumn(version = process.env.EMBEDDING_VERSION) {
   // TODO 5: embedding_v2 when EMBEDDING_VERSION is v2, otherwise embedding
-  // Use a fixed choice, never a column name from the request.
-  throw new Error('TODO 5: implement resolveSearchColumn');
+  return version === 'v2' ? 'embedding_v2' : 'embedding';
 }
 
 searchRouter.get('/search', async (req, res) => {
