@@ -2,6 +2,31 @@ import { createHash } from 'crypto';
 import { db, redis, llm } from './infra.js';
 
 /**
+ * Logs cost estimate to embedding_costs.
+ * Model, text.length, Math.ceil(text.length / 4) and (tokens / 1_000_000) * 0.02.
+ * Catches any logging failure so it never stops the migration.
+ * @param {any} dbClient
+ * @param {string} model
+ * @param {string} text
+ * @returns {Promise<void>}
+ */
+export async function logEmbeddingCost(dbClient, model, text) {
+  try {
+    const textLength = text.length;
+    const estimatedTokens = Math.ceil(textLength / 4);
+    const estimatedCost = (estimatedTokens / 1_000_000) * 0.02;
+
+    await dbClient.query(
+      `INSERT INTO embedding_costs (model, text_length, estimated_tokens, estimated_cost)
+       VALUES ($1, $2, $3, $4)`,
+      [model, textLength, estimatedTokens, estimatedCost]
+    );
+  } catch (err) {
+    // Catch a logging failure so it never stops the migration
+  }
+}
+
+/**
  * Embeds text using Redis cache and logs cost estimate to embedding_costs.
  * @param {string} text
  * @param {{ model?: string, dbClient?: any, redisClient?: any, llmClient?: any }} [opts]
@@ -44,12 +69,7 @@ export async function embed(text, opts = {}) {
   // after the vector is obtained, insert one row into embedding_costs with
   // the model, text.length, Math.ceil(text.length / 4) and (tokens / 1_000_000) * 0.02.
   // Catch a logging failure so it never stops the migration.
-  throw new Error('TODO 6: implement cost logging in embed.js');
+  await logEmbeddingCost(dbClient, model, text);
 
   return vector;
-}
-
-export async function logEmbeddingCost(dbClient, model, text) {
-  // Helper for logging cost estimate
-  throw new Error('TODO 6: implement logEmbeddingCost');
 }

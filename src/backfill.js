@@ -1,26 +1,70 @@
 import { db } from './infra.js';
 import { embed } from './embed.js';
 
+/**
+ * Reads last_id from job_progress, or starts at 0 if there is no row.
+ * @param {any} dbClient
+ * @param {string} [jobName]
+ * @returns {Promise<number>}
+ */
 export async function getCheckpoint(dbClient, jobName = 'reembedding_backfill') {
   // TODO 1: read last_id from job_progress, or start at 0 if there is no row
-  throw new Error('TODO 1: implement getCheckpoint');
+  const res = await dbClient.query(
+    'SELECT last_id FROM job_progress WHERE job_name = $1',
+    [jobName]
+  );
+  return res.rows.length > 0 ? Number(res.rows[0].last_id) : 0;
 }
 
+/**
+ * Selects up to 50 rows where id > lastId AND embedding_v2 IS NULL, ordered by id.
+ * @param {any} dbClient
+ * @param {number} lastId
+ * @param {number} [batchSize]
+ * @returns {Promise<Array<{ id: number, text: string }>>}
+ */
 export async function fetchBatch(dbClient, lastId, batchSize = 50) {
   // TODO 2: select up to 50 rows where id > lastId AND embedding_v2 IS NULL, ordered by id
-  throw new Error('TODO 2: implement fetchBatch');
+  const res = await dbClient.query(
+    'SELECT id, text FROM posts_embeddings WHERE id > $1 AND embedding_v2 IS NULL ORDER BY id ASC LIMIT $2',
+    [lastId, batchSize]
+  );
+  return res.rows;
 }
 
+/**
+ * Saves progress checkpoint with INSERT ... ON CONFLICT (job_name) DO UPDATE.
+ * @param {any} dbClient
+ * @param {string} jobName
+ * @param {number} lastId
+ * @returns {Promise<void>}
+ */
 export async function saveCheckpoint(dbClient, jobName, lastId) {
   // TODO 3: write lastId with INSERT ... ON CONFLICT (job_name) DO UPDATE
-  throw new Error('TODO 3: implement saveCheckpoint');
+  await dbClient.query(
+    `INSERT INTO job_progress (job_name, last_id, updated_at)
+     VALUES ($1, $2, now())
+     ON CONFLICT (job_name) DO UPDATE SET
+       last_id = EXCLUDED.last_id,
+       updated_at = now()`,
+    [jobName, lastId]
+  );
 }
 
+/**
+ * Pauses execution for the specified milliseconds (default 200ms).
+ * @param {number} [ms]
+ * @returns {Promise<void>}
+ */
 export function pause(ms = 200) {
   // TODO 4: wait 200 ms between batches
-  throw new Error('TODO 4: implement pause');
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Runs the resumable backfill loop.
+ * @param {any} [dbClient]
+ */
 export async function runBackfill(dbClient = db) {
   const jobName = 'reembedding_backfill';
   let lastId = await getCheckpoint(dbClient, jobName);
